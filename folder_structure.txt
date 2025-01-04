@@ -1,0 +1,126 @@
+.env.development
+.env.production
+.eslintrc
+.gitignore
+dist
+  config
+    env.js
+    swagger.js
+  constants
+    auth.constants.js
+  controllers
+    auth.controller.js
+    kyc.controller.js
+  dtos
+    auth
+      login.dto.js
+      register.dto.js
+    kyc
+      submit-kyc.dto.js
+      update-kyc-status.dto.js
+  middleware
+    auth.middleware.js
+    error-handler.middleware.js
+    form-parser.middleware.js
+    logging.middleware.js
+    monitoring.middleware.js
+    rate-limit.middleware.js
+    validation.middleware.js
+  models
+    kyc.model.js
+    user.model.js
+  repositories
+    kyc.repository.js
+    user.repository.js
+  routes
+    auth.routes.js
+    index.js
+    kyc.routes.js
+  server.js
+  services
+    file-upload.service.js
+    mongodb.service.js
+    redis.service.js
+    token.service.js
+  types
+    auth.types.js
+    common.types.js
+    kyc.types.js
+    user.types.js
+  utils
+    core.js
+    errors
+      custom-errors.js
+    logger.js
+    response-formatter.js
+docker-compose.mongodb.yml
+etc
+  nginx
+    nginx.dev.conf
+    nginx.prod.conf
+  prometheus
+    prometheus.yml
+  redis
+generateStructure.js
+logs
+  .6b77785a74c362881f6fb7e95a7530280abbf9ed-audit.json
+  .c1e07aa271642f54b3b30402d507b295c18426a1-audit.json
+  all-2025-01-03.log
+  all-2025-01-04.log
+  error-2025-01-03.log
+  error-2025-01-04.log
+package-lock.json
+package.json
+src
+  config
+    env.ts
+    swagger.ts
+  constants
+    auth.constants.ts
+  controllers
+    auth.controller.ts
+    kyc.controller.ts
+  dtos
+    auth
+      login.dto.ts
+      register.dto.ts
+    kyc
+      submit-kyc.dto.ts
+      update-kyc-status.dto.ts
+  middleware
+    auth.middleware.ts
+    error-handler.middleware.ts
+    form-parser.middleware.ts
+    logging.middleware.ts
+    monitoring.middleware.ts
+    rate-limit.middleware.ts
+    validation.middleware.ts
+  models
+    kyc.model.ts
+    user.model.ts
+  repositories
+    kyc.repository.ts
+    user.repository.ts
+  routes
+    auth.routes.ts
+    index.ts
+    kyc.routes.ts
+  server.ts
+  services
+    file-upload.service.ts
+    mongodb.service.ts
+    redis.service.ts
+    token.service.ts
+  types
+    auth.types.ts
+    common.types.ts
+    express.types.d.ts
+    kyc.types.ts
+    user.types.ts
+  utils
+    core.ts
+    errors
+      custom-errors.ts
+    logger.ts
+    response-formatter.ts
+tsconfig.json

@@ -1,17 +1,28 @@
 import { BadRequestError } from "@/utils/errors/custom-errors";
+import Logger from "@/utils/logger";
 import { plainToInstance } from "class-transformer";
 import { validate, ValidationError } from "class-validator";
 import { RequestHandler } from "express";
 
 export function validateDto(dto: any): RequestHandler {
   return async (req, res, next) => {
+    console.log("req.body", req.body);
     try {
+      if (req.file) {
+        Logger.info("File received:", {
+          fieldname: req.file.fieldname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+        });
+      }
+
       const dtoObj = plainToInstance(dto, req.body);
       const errors = await validate(dtoObj, {
         whitelist: true,
         forbidNonWhitelisted: true,
       });
 
+      console.log("errors", errors);
       if (errors.length > 0) {
         const errorMessages = formatValidationErrors(errors);
         throw new BadRequestError("Validation failed", errorMessages);
@@ -20,7 +31,7 @@ export function validateDto(dto: any): RequestHandler {
       req.validatedData = dtoObj;
       next();
     } catch (error) {
-      next(error);
+      throw error;
     }
   };
 }

@@ -5,6 +5,7 @@ import {
   TokenPayload,
 } from "@/types/auth.types";
 import { UserRole } from "@/types/user.types";
+import { NotFoundError } from "@/utils/errors/custom-errors";
 import Logger from "@/utils/logger";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
@@ -25,12 +26,19 @@ export class TokenService {
     return TokenService.instance;
   }
 
-  public generateAccessToken(userId: string, role: UserRole): string {
-    const tokenId = crypto.randomBytes(16).toString("hex");
+  public generateAccessToken(
+    userId: string,
+    role: UserRole,
+    tokenId?: string // Make tokenId optional for backward compatibility
+  ): string {
+    // Use provided tokenId or generate new one
+    const finalTokenId = tokenId || crypto.randomBytes(16).toString("hex");
+    Logger.debug(`Generating access token with tokenId: ${finalTokenId}`);
+
     const payload: TokenPayload = {
       userId,
       role,
-      tokenId,
+      tokenId: finalTokenId,
       type: "access",
     };
 
@@ -101,7 +109,8 @@ export class TokenService {
     expiryTime: number
   ): Promise<void> {
     const client = this.redisClient.getClient();
-    const key = `blacklisted_tokens:${tokenId}`;
+    const key = `blacklisted_token:${tokenId}`;
+    console.log("blacklisted here");
 
     await client.set(key, "1");
     await client.expire(key, expiryTime);
@@ -109,8 +118,10 @@ export class TokenService {
 
   public async isTokenBlacklisted(tokenId: string): Promise<boolean> {
     const client = this.redisClient.getClient();
-    const exists = await client.exists(`blacklisted_tokens:${tokenId}`);
-    return exists === 1;
+    const key = `blacklisted_token:${tokenId}`;
+    const result = await client.get(key);
+    console.log("Checking blacklist for token:", tokenId, "Result:", result);
+    return !!result;
   }
 
   public async validateRefreshToken(token: string): Promise<TokenPayload> {
@@ -142,10 +153,23 @@ export class TokenService {
   ): Promise<void> {
     const client = this.redisClient.getClient();
 
+    // Get the session data before deleting it
+    const sessionData = await client.hGet(`user_sessions:${userId}`, tokenId);
+    if (!sessionData) {
+      throw new NotFoundError("Session not found");
+    }
+
+    // Parse the session to get associated token information
+    const session = JSON.parse(sessionData);
+
+    // Blacklist both the access token and refresh token
     await Promise.all([
-      client.hDel(`user_sessions:${userId}`, tokenId),
       this.blacklistToken(tokenId, AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY),
+      client.hDel(`user_sessions:${userId}`, tokenId),
+      client.del(`refresh_token:${userId}:${tokenId}`),
     ]);
+
+    Logger.info(`Session revoked for user ${userId} with token ${tokenId}`);
   }
 
   public async revokeAllUserSessions(userId: string): Promise<void> {
@@ -172,9 +196,10 @@ export class TokenService {
     const client = this.redisClient.getClient();
     const sessions = await client.hGetAll(`user_sessions:${userId}`);
 
-    return Object.values(sessions).map((sessionStr) => {
+    return Object.entries(sessions).map(([tokenId, sessionStr]) => {
       const session = JSON.parse(sessionStr);
       return {
+        tokenId, // Include the hash field as tokenId
         ...session,
         lastUsed: new Date(session.lastUsed),
         expiryTime: new Date(session.expiryTime),

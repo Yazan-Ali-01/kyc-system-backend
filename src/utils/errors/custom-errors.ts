@@ -1,11 +1,13 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  public readonly status: string;
   public readonly errors?: any[];
 
-  constructor(message: string, statusCode: number, errors?: any[]) {
+  constructor(statusCode: number, message: string, errors?: any[]) {
     super(message);
     this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
     this.isOperational = true;
     this.errors = errors;
 
@@ -24,48 +26,48 @@ export class RateLimitError extends AppError {
       },
     ];
 
-    super(message, 429, errors); // 429 is the standard HTTP status code for rate limiting
+    super(429, message, errors);
   }
 }
 
 export class BadRequestError extends AppError {
   constructor(message: string = "Bad Request", errors?: any[]) {
-    super(message, 400, errors);
+    super(400, message, errors);
   }
 }
 
 export class UnauthorizedError extends AppError {
   constructor(message: string = "Unauthorized") {
-    super(message, 401);
+    super(401, message);
   }
 }
 
 export class ForbiddenError extends AppError {
   constructor(message: string = "Forbidden") {
-    super(message, 403);
+    super(403, message);
   }
 }
 
 export class NotFoundError extends AppError {
   constructor(message: string = "Resource not found") {
-    super(message, 404);
+    super(404, message);
   }
 }
 
 export class ConflictError extends AppError {
   constructor(message: string = "Conflict") {
-    super(message, 409);
+    super(409, message);
   }
 }
 
 export class ValidationError extends AppError {
   constructor(errors: any[]) {
-    super("Validation Error", 422, errors);
+    super(422, "Validation Error", errors);
   }
 }
 
 export class InternalServerError extends AppError {
   constructor(message: string = "Internal Server Error") {
-    super(message, 500);
+    super(500, message);
   }
 }

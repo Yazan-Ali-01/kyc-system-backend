@@ -3,8 +3,10 @@ import { AUTH_CONSTANTS } from "@/constants/auth.constants";
 import { UserRepository } from "@/repositories/user.repository";
 import { TokenService } from "@/services/token.service";
 import { SessionInfo } from "@/types/auth.types";
+import { normalizeIpAddress } from "@/utils/core";
 import {
   BadRequestError,
+  NotFoundError,
   UnauthorizedError,
 } from "@/utils/errors/custom-errors";
 import { ResponseFormatter } from "@/utils/response-formatter";
@@ -29,16 +31,16 @@ export class AuthController {
   }
 
   public register = async (req: Request, res: Response): Promise<void> => {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, role } = req.body;
 
     // Generate verification token
     const verificationToken = randomBytes(32).toString("hex");
-
     const user = await this.userRepository.createUser({
       email,
       password,
       firstName,
       lastName,
+      role,
       verificationToken,
       isEmailVerified: false,
     });
@@ -63,7 +65,9 @@ export class AuthController {
   public login = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body;
     const deviceInfo = req.headers["user-agent"] || "unknown";
-    const ipAddress = req.ip || req.socket.remoteAddress || "unknown";
+    const ipAddress = normalizeIpAddress(
+      req.ip || req.socket.remoteAddress || "unknown"
+    );
 
     const user = await this.userRepository.findUserByEmail(email);
     if (!user) {
@@ -78,9 +82,7 @@ export class AuthController {
     }
 
     // Verify password
-    console.log(1);
     const isPasswordValid = await user.comparePassword(password);
-    console.log(2);
 
     if (!isPasswordValid) {
       await this.userRepository.incrementLoginAttempts(email);
@@ -110,9 +112,9 @@ export class AuthController {
     const tokenId = randomBytes(16).toString("hex");
     const accessToken = this.tokenService.generateAccessToken(
       user.id,
-      user.role
+      user.role,
+      tokenId
     );
-    console.log("here we go", accessToken);
 
     const refreshToken = this.tokenService.generateRefreshToken(
       user.id,
@@ -170,7 +172,9 @@ export class AuthController {
   public refresh = async (req: Request, res: Response): Promise<void> => {
     const { userId, role, tokenId } = req.user!;
     const deviceInfo = req.headers["user-agent"] || "unknown";
-    const ipAddress = req.ip || req.connection.remoteAddress || "unknown";
+    const ipAddress = normalizeIpAddress(
+      req.ip || req.socket.remoteAddress || "unknown"
+    );
 
     // Generate new tokens
     const accessToken = this.tokenService.generateAccessToken(userId, role);
@@ -272,6 +276,15 @@ export class AuthController {
   public revokeSession = async (req: Request, res: Response): Promise<void> => {
     const { userId } = req.user!;
     const { sessionId } = req.params;
+
+    const sessions = await this.tokenService.getUserSessions(userId);
+    const sessionExists = sessions.some(
+      (session) => session.tokenId === sessionId
+    );
+
+    if (!sessionExists) {
+      throw new NotFoundError("Session not found");
+    }
 
     await this.tokenService.revokeUserSession(userId, sessionId);
 

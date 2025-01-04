@@ -1,5 +1,12 @@
 import { UserRole } from "@/types/user.types";
-import { IsEmail, IsEnum, IsString, Matches, MinLength, IsNotEmpty } from "class-validator";
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MinLength,
+} from "class-validator";
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -9,7 +16,7 @@ export class RegisterDto {
   @IsNotEmpty()
   @IsString()
   @MinLength(8)
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/, {
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]{8,}$/, {
     message: "Password must contain at least one letter and one number",
   })
   password!: string;

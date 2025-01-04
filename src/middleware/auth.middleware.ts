@@ -45,10 +45,15 @@ export class AuthMiddleware {
         throw new UnauthorizedError("Invalid token type");
       }
 
+      Logger.debug(`Verifying access token: ${decoded.tokenId}`);
       const isBlacklisted = await this.tokenService.isTokenBlacklisted(
         decoded.tokenId
       );
+
       if (isBlacklisted) {
+        Logger.info(
+          `Blocked request with blacklisted token: ${decoded.tokenId}`
+        );
         throw new UnauthorizedError("Token has been invalidated");
       }
 
@@ -64,10 +69,9 @@ export class AuthMiddleware {
         throw new UnauthorizedError("Access token expired");
       }
       Logger.error("Token verification failed:", error);
-      throw new UnauthorizedError("Invalid access token");
+      throw error;
     }
   };
-
   public verifyRefreshToken = async (
     req: Request,
     res: Response,

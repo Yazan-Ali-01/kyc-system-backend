@@ -1,6 +1,7 @@
 // src/middleware/error-handler.middleware.ts
 
 import { BaseError, ValidationErrorItem } from "@/types/common.types";
+import Logger from "@/utils/logger";
 import { NextFunction, Request, Response } from "express";
 import { MongoServerError } from "mongodb";
 import { Error as MongooseError } from "mongoose";
@@ -27,11 +28,16 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  // Log error
-  console.error("Error:", {
+  // Enhanced logging
+  Logger.error("Error encountered:", {
     name: err.name,
     message: err.message,
     stack: err.stack,
+    url: req.originalUrl,
+    method: req.method,
+    query: req.query,
+    params: req.params,
+    body: req.body,
     timestamp: new Date().toISOString(),
   });
 
@@ -40,8 +46,23 @@ export const errorHandler = (
   let message = "Internal Server Error";
   let errors: any[] | undefined;
 
+  // Handle MongoDB duplicate key errors
+  if (err instanceof MongoServerError && err.code === 11000) {
+    statusCode = 409;
+    message = "Duplicate Entry";
+    if (err.keyPattern && typeof err.keyPattern === "object") {
+      const field = Object.keys(err.keyPattern)[0];
+      const value = err.keyValue?.[field];
+      errors = [
+        {
+          field,
+          message: `${field} '${value}' already exists`,
+        },
+      ];
+    }
+  }
   // Handle operational errors (our custom AppError)
-  if (err instanceof AppError) {
+  else if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
     errors = err.errors;
@@ -55,20 +76,6 @@ export const errorHandler = (
       message: error.message,
     }));
   }
-  // Handle MongoDB duplicate key errors
-  else if (err instanceof MongoServerError && err.code === 11000) {
-    statusCode = 409;
-    message = "Duplicate Entry";
-    if (err.keyPattern && typeof err.keyPattern === "object") {
-      const field = Object.keys(err.keyPattern)[0];
-      errors = [
-        {
-          field,
-          message: `${field} already exists`,
-        },
-      ];
-    }
-  }
   // Handle Express Validator errors
   else if ("array" in err && typeof err.array === "function") {
     statusCode = 422;
@@ -81,17 +88,18 @@ export const errorHandler = (
     statusCode,
     errors,
     req.path,
-    process.env.NODE_ENV === "development" ? err.stack : undefined
+    process.env.NODE_ENV === "development"
+      ? JSON.stringify({ error: err.message, stack: err.stack })
+      : undefined
   );
 
   res.status(statusCode).json(formattedResponse);
 };
 
-// Catch 404 and forward to error handler
 export const notFoundHandler = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  throw new NotFoundError();
+  throw new NotFoundError(`Route ${req.originalUrl} not found`);
 };

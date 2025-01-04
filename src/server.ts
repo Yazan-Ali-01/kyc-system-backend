@@ -1,10 +1,15 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
+import swaggerUi from "swagger-ui-express";
+
 import express, { Express, Router } from "express";
 import "express-async-errors";
 import helmet from "helmet";
+import "reflect-metadata";
 
 import { loadEnvConfig } from "@/config/env";
+import { swaggerSpec } from "@/config/swagger";
 import {
   errorHandler,
   notFoundHandler,
@@ -15,6 +20,7 @@ import { RateLimiterMiddleware } from "@/middleware/rate-limit.middleware";
 import routes from "@/routes";
 import { MongoDBService } from "@/services/mongodb.service";
 import { RedisService } from "@/services/redis.service";
+import { AppError, NotFoundError } from "@/utils/errors/custom-errors";
 import Logger from "@/utils/logger";
 
 class App {
@@ -31,11 +37,53 @@ class App {
     this.redisService = RedisService.getInstance();
     this.rateLimiter = new RateLimiterMiddleware();
 
+    const jsonLimit = "5mb";
+    const urlEncodedLimit = "5mb";
+
     // Set up basic Express middleware first
-    this.app.use(express.json({ limit: "10kb" }));
-    this.app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+    this.app.use(
+      express.json({
+        limit: jsonLimit,
+        strict: false,
+      })
+    );
+    this.app.use(
+      express.urlencoded({
+        extended: true,
+        limit: urlEncodedLimit,
+      })
+    );
+
+    this.app.use((req, res, next) => {
+      if (req.headers["content-type"]?.includes("multipart/form-data")) {
+        return next();
+      }
+      express.json({ limit: jsonLimit })(req, res, next);
+    });
 
     this.setupHealthCheck();
+  }
+
+  private setupSwagger(): void {
+    if (process.env.NODE_ENV !== "production") {
+      // Disable helmet for Swagger UI
+      this.app.use("/api-docs", (req, res, next) => {
+        helmet({
+          contentSecurityPolicy: false,
+          crossOriginEmbedderPolicy: false,
+        })(req, res, next);
+      });
+
+      this.app.use("/api-docs", swaggerUi.serve);
+      this.app.get("/api-docs", swaggerUi.setup(swaggerSpec));
+
+      this.app.get("/swagger.json", (req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.send(swaggerSpec);
+      });
+
+      Logger.info("Swagger UI initialized at /api-docs");
+    }
   }
 
   public async init(): Promise<Express> {
@@ -84,6 +132,10 @@ class App {
     this.setupMiddleware();
     Logger.info("Middleware setup completed");
 
+    Logger.info("Setting up Swagger...");
+    this.setupSwagger();
+    Logger.info("Swagger setup completed");
+
     Logger.info("Setting up routes...");
     this.setupRoutes();
     Logger.info("Routes setup completed");
@@ -94,6 +146,7 @@ class App {
   }
   private setupMiddleware(): void {
     // Add basic middleware first
+    this.app.use(cookieParser());
     this.app.use(requestLogger);
     this.app.use(monitoringMiddleware);
 
@@ -125,7 +178,8 @@ class App {
     // Set up rate limiters
     const globalRateLimit = this.rateLimiter.createRateLimiter({
       windowMs: 15 * 60 * 1000,
-      max: 100,
+
+      max: 10000,
     });
 
     // Apply rate limiters
@@ -159,49 +213,76 @@ class App {
       next();
     });
 
+    this.app.use(notFoundHandler); // Handle 404s
+    this.app.use(errorHandler);
+
     Logger.info("Routes setup completed");
   }
 
   private setupErrorHandling(): void {
-    // Middleware error logger
-    this.app.use((err: any, req: any, res: any, next: any) => {
-      Logger.error("Initial error catch:", err);
-      throw err;
-    });
-
     // 404 handler for unmatched routes
     this.app.use((req, res, next) => {
       if (!res.headersSent) {
         Logger.info(`No route match: ${req.method} ${req.originalUrl}`);
-        notFoundHandler(req, res, next);
+        throw new NotFoundError();
       } else {
         next();
       }
     });
 
     // Final error handler
-    this.app.use((err: any, req: any, res: any, next: any) => {
-      Logger.error("Final error handler:", {
+    this.app.use((err: Error | AppError, req: any, res: any, next: any) => {
+      Logger.error("Error encountered:", {
         error: err,
         stack: err.stack,
         url: req.originalUrl,
         method: req.method,
       });
 
-      // Ensure we don't send multiple responses
-      if (!res.headersSent) {
-        errorHandler(err, req, res, next);
+      if (err instanceof AppError) {
+        return res.status(err.statusCode).json({
+          status: err.status,
+          message: err.message,
+          errors: err.errors,
+          ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+        });
       }
+
+      // Handle unknown errors
+      const statusCode = 500;
+      return res.status(statusCode).json({
+        status: "error",
+        message: "Internal server error",
+        ...(process.env.NODE_ENV === "development" && {
+          actualError: err.message,
+          stack: err.stack,
+        }),
+      });
     });
 
-    // Process error handlers
-    process.on("uncaughtException", (error) => {
+    // Process error handlers for truly uncaught errors
+    process.on("uncaughtException", (error: Error) => {
       Logger.error("Uncaught Exception:", error);
+
+      if (error instanceof AppError && error.isOperational) {
+        Logger.info("Operational error, no need to crash");
+        return;
+      }
+
+      Logger.error("Fatal error encountered, shutting down");
       process.exit(1);
     });
 
-    process.on("unhandledRejection", (reason, promise) => {
+    process.on("unhandledRejection", (reason: any) => {
       Logger.error("Unhandled Rejection:", reason);
+
+      if (reason instanceof AppError && reason.isOperational) {
+        Logger.info("Operational error, no need to crash");
+        return;
+      }
+
+      Logger.error("Fatal error encountered, shutting down");
+      process.exit(1);
     });
   }
 
