@@ -5,6 +5,7 @@ A robust and secure backend service built with Express.js and TypeScript, featur
 ## Features
 
 - **Authentication System**
+
   - User registration and login
   - JWT-based authentication with access and refresh tokens
   - Session management with device tracking
@@ -14,6 +15,7 @@ A robust and secure backend service built with Express.js and TypeScript, featur
   - Account security (login attempts, account locking)
 
 - **KYC System**
+
   - KYC documentation submission
   - Admin KYC verification workflow
   - Document upload handling
@@ -22,6 +24,7 @@ A robust and secure backend service built with Express.js and TypeScript, featur
   - Pending submissions management
 
 - **Security Features**
+
   - CORS protection
   - Helmet security headers
   - Rate limiting
@@ -37,11 +40,13 @@ A robust and secure backend service built with Express.js and TypeScript, featur
 ## Architecture & Design Patterns
 
 - **Clean Architecture**
+
   - Clear separation of concerns with layered architecture
   - Domain-driven design principles
   - Independence from external frameworks
 
 - **Design Patterns**
+
   - Singleton Pattern (Service instances)
   - Repository Pattern (Data access)
   - Factory Pattern (Error handling)
@@ -106,23 +111,27 @@ docker ps
 #### Option B: Local Installation
 
 1. Install MongoDB:
+
    - [MongoDB Installation Guide](https://docs.mongodb.com/manual/installation/)
    - Start MongoDB service:
+
      ```bash
      # On Ubuntu/Debian
      sudo systemctl start mongod
-     
+
      # On macOS with Homebrew
      brew services start mongodb-community
      ```
 
 2. Install Redis:
+
    - [Redis Installation Guide](https://redis.io/topics/quickstart)
    - Start Redis service:
+
      ```bash
      # On Ubuntu/Debian
      sudo systemctl start redis
-     
+
      # On macOS with Homebrew
      brew services start redis
      ```
@@ -130,21 +139,26 @@ docker ps
 ### 2. Application Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone [repository-url]
    cd [project-name]
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Environment Configuration**
+
    - Copy `.env.development` to create `.env` for your environment
+
    ```bash
    cp .env.development .env
    ```
+
    - Update the following variables:
      ```
      PORT=3000
@@ -154,6 +168,7 @@ docker ps
      ```
 
 4. **Start Development Server**
+
    ```bash
    npm run dev
    ```
@@ -168,8 +183,11 @@ docker ps
 Alternatively, you can use Docker Compose to run the entire application stack (including MongoDB and Redis):
 
 ```bash
-# Start all services
-docker compose up -d
+# Development
+docker-compose -f docker-compose.dev.yml --env-file .env.development up  --build
+
+# Production
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up  --build
 
 # View logs
 docker compose logs -f
@@ -183,11 +201,13 @@ This will start the application, MongoDB, and Redis in containers with the prope
 ## API Documentation
 
 The API documentation is available via Swagger UI when running in development mode:
+
 - Access at: `http://localhost:3000/api-docs`
 
 ### Key Endpoints
 
 #### Authentication
+
 - `POST /api/v1/auth/register` - Register new user
 - `POST /api/v1/auth/login` - User login
 - `POST /api/v1/auth/refresh` - Refresh access token
@@ -197,6 +217,7 @@ The API documentation is available via Swagger UI when running in development mo
 - `DELETE /api/v1/auth/sessions/{sessionId}` - Revoke specific session
 
 #### KYC
+
 - `POST /api/v1/kyc/submit` - Submit KYC documentation
 - `PATCH /api/v1/kyc/{kycId}/status` - Update KYC submission status (Admin only)
 - `GET /api/v1/kyc/pending` - Get pending KYC submissions (Admin only)

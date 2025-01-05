@@ -69,7 +69,7 @@ export class AuthController {
 
     const user = await this.userRepository.findUserByEmail(email);
     if (!user) {
-      throw new UnauthorizedError("Invalid credentials");
+      throw new UnauthorizedError("Email not found");
     }
 
     // Check if account is locked

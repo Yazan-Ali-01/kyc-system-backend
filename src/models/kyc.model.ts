@@ -1,4 +1,3 @@
-// src/models/kyc.model.ts
 import { IdDocumentType, KycStatus } from "@/types/kyc.types";
 import mongoose, { Document, Schema } from "mongoose";
 
@@ -37,7 +36,6 @@ const KYCSchema = new Schema<IKYC>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
     },
     firstName: {
       type: String,
@@ -80,7 +78,6 @@ const KYCSchema = new Schema<IKYC>(
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: "pending",
-      index: true,
     },
     submissionDate: {
       type: Date,

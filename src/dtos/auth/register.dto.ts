@@ -10,13 +10,15 @@ import {
 
 export class RegisterDto {
   @IsNotEmpty()
-  @IsEmail()
+  @IsEmail({}, { message: "Invalid email provided" })
   email!: string;
 
   @IsNotEmpty()
   @IsString()
-  @MinLength(8)
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]{8,}$/, {
+  @MinLength(8, {
+    message: "Password must be at least 8 characters long",
+  })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+]+$/, {
     message: "Password must contain at least one letter and one number",
   })
   password!: string;
