@@ -10,10 +10,6 @@ import "reflect-metadata";
 
 import { loadEnvConfig } from "@/config/env";
 import { swaggerSpec } from "@/config/swagger";
-import {
-  errorHandler,
-  notFoundHandler,
-} from "@/middleware/error-handler.middleware";
 import { requestLogger } from "@/middleware/logging.middleware";
 import { monitoringMiddleware } from "@/middleware/monitoring.middleware";
 import { RateLimiterMiddleware } from "@/middleware/rate-limit.middleware";
@@ -145,12 +141,27 @@ class App {
     Logger.info("Error handling setup completed");
   }
   private setupMiddleware(): void {
-    // Add basic middleware first
-    this.app.use(cookieParser());
-    this.app.use(requestLogger);
-    this.app.use(monitoringMiddleware);
+    this.app.use(
+      cors({
+        origin: true, // TBD update in production
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true,
+        maxAge: 86400,
+      })
+    );
 
-    // Configure security middleware
+    this.app.get("/test-cors", (req, res) => {
+      console.log("Test CORS endpoint reached");
+      res.json({ message: "CORS test successful" });
+    });
+
+    // 2. Basic parsing middleware
+    this.app.use(express.json({ limit: "5mb", strict: false }));
+    this.app.use(express.urlencoded({ extended: true, limit: "5mb" }));
+    this.app.use(cookieParser());
+
+    // 3. Security middleware
     this.app.use(
       helmet({
         contentSecurityPolicy: {
@@ -164,28 +175,18 @@ class App {
       })
     );
 
-    // Configure CORS
-    this.app.use(
-      cors({
-        origin: process.env.ALLOWED_ORIGINS?.split(",") || "*",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-        maxAge: 86400,
-      })
-    );
+    // 4. Logging and monitoring
+    this.app.use(requestLogger);
+    this.app.use(monitoringMiddleware);
 
-    // Set up rate limiters
+    // 5. Rate limiting
     const globalRateLimit = this.rateLimiter.createRateLimiter({
       windowMs: 15 * 60 * 1000,
-
       max: 10000,
     });
-
-    // Apply rate limiters
     this.app.use(globalRateLimit);
 
-    // Mount the middleware router
+    // 6. Mount the middleware router
     this.app.use(this.middleware);
   }
 
@@ -207,15 +208,6 @@ class App {
     // Mount the API v1 router to the main app
     this.app.use("/api/v1", routes);
 
-    // Catch-all for unmatched routes
-    this.app.use((req, res, next) => {
-      Logger.info(`Unmatched route: ${req.method} ${req.originalUrl}`);
-      next();
-    });
-
-    this.app.use(notFoundHandler); // Handle 404s
-    this.app.use(errorHandler);
-
     Logger.info("Routes setup completed");
   }
 
@@ -228,36 +220,6 @@ class App {
       } else {
         next();
       }
-    });
-
-    // Final error handler
-    this.app.use((err: Error | AppError, req: any, res: any, next: any) => {
-      Logger.error("Error encountered:", {
-        error: err,
-        stack: err.stack,
-        url: req.originalUrl,
-        method: req.method,
-      });
-
-      if (err instanceof AppError) {
-        return res.status(err.statusCode).json({
-          status: err.status,
-          message: err.message,
-          errors: err.errors,
-          ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
-        });
-      }
-
-      // Handle unknown errors
-      const statusCode = 500;
-      return res.status(statusCode).json({
-        status: "error",
-        message: "Internal server error",
-        ...(process.env.NODE_ENV === "development" && {
-          actualError: err.message,
-          stack: err.stack,
-        }),
-      });
     });
 
     // Process error handlers for truly uncaught errors

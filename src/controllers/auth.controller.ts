@@ -176,6 +176,11 @@ export class AuthController {
       req.ip || req.socket.remoteAddress || "unknown"
     );
 
+    const user = await this.userRepository.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError("User not found");
+    }
+
     // Generate new tokens
     const accessToken = this.tokenService.generateAccessToken(userId, role);
     const refreshToken = this.tokenService.generateRefreshToken(userId, role);
@@ -221,7 +226,13 @@ export class AuthController {
 
     res.json(
       ResponseFormatter.success(
-        { userId, role },
+        {
+          userId: user.id,
+          role: user.role,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
         "Tokens refreshed successfully",
         200
       )

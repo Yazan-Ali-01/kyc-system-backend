@@ -5,7 +5,7 @@ import Logger from "@/utils/logger";
 import { NextFunction, Request, Response } from "express";
 import { MongoServerError } from "mongodb";
 import { Error as MongooseError } from "mongoose";
-import { AppError, NotFoundError } from "../utils/errors/custom-errors";
+import { AppError } from "../utils/errors/custom-errors";
 import { ResponseFormatter } from "../utils/response-formatter";
 
 // Custom type for express-validator ValidationError
@@ -94,12 +94,4 @@ export const errorHandler = (
   );
 
   res.status(statusCode).json(formattedResponse);
-};
-
-export const notFoundHandler = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  throw new NotFoundError(`Route ${req.originalUrl} not found`);
 };
