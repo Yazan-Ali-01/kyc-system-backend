@@ -51,11 +51,9 @@ export class AuthController {
       isEmailVerified: true,
       verificationToken: undefined,
     });
+    const { password: _, ...userWithoutPass } = user;
     const formattedResponse = ResponseFormatter.success(
-      {
-        userId: user.id,
-        email: user.email,
-      },
+      userWithoutPass,
       "User registered successfully",
       201
     );
