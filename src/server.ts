@@ -10,6 +10,7 @@ import "reflect-metadata";
 
 import { loadEnvConfig } from "@/config/env";
 import { swaggerSpec } from "@/config/swagger";
+import { errorHandler } from "@/middleware/error-handler.middleware";
 import { requestLogger } from "@/middleware/logging.middleware";
 import { monitoringMiddleware } from "@/middleware/monitoring.middleware";
 import { RateLimiterMiddleware } from "@/middleware/rate-limit.middleware";
@@ -221,6 +222,8 @@ class App {
         next();
       }
     });
+
+    this.app.use(errorHandler);
 
     // Process error handlers for truly uncaught errors
     process.on("uncaughtException", (error: Error) => {
