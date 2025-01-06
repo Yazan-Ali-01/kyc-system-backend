@@ -29,9 +29,8 @@ export class TokenService {
   public generateAccessToken(
     userId: string,
     role: UserRole,
-    tokenId?: string // Make tokenId optional for backward compatibility
+    tokenId?: string
   ): string {
-    // Use provided tokenId or generate new one
     const finalTokenId = tokenId || crypto.randomBytes(16).toString("hex");
     Logger.debug(`Generating access token with tokenId: ${finalTokenId}`);
 
@@ -153,16 +152,13 @@ export class TokenService {
   ): Promise<void> {
     const client = this.redisClient.getClient();
 
-    // Get the session data before deleting it
     const sessionData = await client.hGet(`user_sessions:${userId}`, tokenId);
     if (!sessionData) {
       throw new NotFoundError("Session not found");
     }
 
-    // Parse the session to get associated token information
     const session = JSON.parse(sessionData);
 
-    // Blacklist both the access token and refresh token
     await Promise.all([
       this.blacklistToken(tokenId, AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY),
       client.hDel(`user_sessions:${userId}`, tokenId),
@@ -199,7 +195,7 @@ export class TokenService {
     return Object.entries(sessions).map(([tokenId, sessionStr]) => {
       const session = JSON.parse(sessionStr);
       return {
-        tokenId, // Include the hash field as tokenId
+        tokenId,
         ...session,
         lastUsed: new Date(session.lastUsed),
         expiryTime: new Date(session.expiryTime),

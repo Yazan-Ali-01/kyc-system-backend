@@ -1,5 +1,3 @@
-// src/middleware/error-handler.middleware.ts
-
 import { BaseError, ValidationErrorItem } from "@/types/common.types";
 import Logger from "@/utils/logger";
 import { NextFunction, Request, Response } from "express";
@@ -8,12 +6,10 @@ import { Error as MongooseError } from "mongoose";
 import { AppError } from "../utils/errors/custom-errors";
 import { ResponseFormatter } from "../utils/response-formatter";
 
-// Custom type for express-validator ValidationError
 interface ExpressValidationError extends BaseError {
   array: () => ValidationErrorItem[];
 }
 
-// Combined error type
 type CombinedError = (
   | Error
   | AppError
@@ -28,7 +24,6 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  // Enhanced logging
   Logger.error("Error encountered:", {
     name: err.name,
     message: err.message,
@@ -41,12 +36,10 @@ export const errorHandler = (
     timestamp: new Date().toISOString(),
   });
 
-  // Default error
   let statusCode = 500;
   let message = "Internal Server Error";
   let errors: any[] | undefined;
 
-  // Handle MongoDB duplicate key errors
   if (err instanceof MongoServerError && err.code === 11000) {
     statusCode = 409;
     message = "Duplicate Entry";
@@ -60,24 +53,18 @@ export const errorHandler = (
         },
       ];
     }
-  }
-  // Handle operational errors (our custom AppError)
-  else if (err instanceof AppError) {
+  } else if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
     errors = err.errors;
-  }
-  // Handle Mongoose validation errors
-  else if (err instanceof MongooseError.ValidationError) {
+  } else if (err instanceof MongooseError.ValidationError) {
     statusCode = 422;
     message = "Validation Error";
     errors = Object.values(err.errors).map((error) => ({
       field: error.path,
       message: error.message,
     }));
-  }
-  // Handle Express Validator errors
-  else if ("array" in err && typeof err.array === "function") {
+  } else if ("array" in err && typeof err.array === "function") {
     statusCode = 422;
     message = "Validation Error";
     errors = err.array();

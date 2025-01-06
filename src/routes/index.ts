@@ -1,16 +1,16 @@
 import { KycRoutes } from "@/routes/kyc.routes";
+import { ReportsRoutes } from "@/routes/reports.routes";
 import { Router } from "express";
 import { AuthRoutes } from "./auth.routes";
-// import { TestRoutes } from "./test.routes";
 
 const router = Router();
 
-// Initialize route handlers
 const authRoutes = new AuthRoutes();
 
-// Mount routes
 router.use("/auth", authRoutes.getRouter());
 
 router.use("/kyc", new KycRoutes().getRouter());
+
+router.use("/reports", new ReportsRoutes().getRouter());
 
 export default router;

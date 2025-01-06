@@ -135,10 +135,9 @@ export class AuthRoutes {
   }
 
   private setupRoutes(): void {
-    // Rate limiter for auth routes
     const authRateLimit = this.rateLimiter.createRateLimiter({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 1000,
+      windowMs: 15 * 60 * 1000,
+      max: 100,
       keyPrefix: "auth",
     });
 
@@ -398,7 +397,7 @@ export class AuthRoutes {
       this.authController.revokeSession
     );
 
-     /**
+    /**
      * @swagger
      * /api/v1/auth/update:
      *   patch:
@@ -455,7 +454,7 @@ export class AuthRoutes {
      *       400:
      *         $ref: '#/components/responses/ValidationError'
      */
-     this.router.patch(
+    this.router.patch(
       "/update",
       this.authMiddleware.verifyAccessToken,
       validateDto(UpdateUserDto),

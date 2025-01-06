@@ -4,13 +4,10 @@ import { ResponseFormatter } from "@/utils/response-formatter";
 import { NextFunction, Request, Response } from "express";
 import promClient from "prom-client";
 
-// Create a Registry
 const register = new promClient.Registry();
 
-// Add default metrics
 promClient.collectDefaultMetrics({ register });
 
-// Create custom metrics
 const httpRequestDurationMicroseconds = new promClient.Histogram({
   name: "http_request_duration_seconds",
   help: "Duration of HTTP requests in seconds",
@@ -63,7 +60,6 @@ export const monitoringMiddleware = (
         .inc();
     } catch (error) {
       Logger.error("Error recording metrics:", error);
-      // I'm not throwing error here as this is post-response monitoring
     }
   });
 

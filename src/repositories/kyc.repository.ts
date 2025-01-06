@@ -1,4 +1,3 @@
-// src/repositories/kyc.repository.ts
 import { IKYC, KYC } from "@/models/kyc.model";
 import { KycStatus, KycSubmissionDto, KycUpdateDto } from "@/types/kyc.types";
 import { NotFoundError } from "@/utils/errors/custom-errors";
@@ -38,13 +37,11 @@ export class KycRepository {
     userId?: string
   ): Promise<IKYC | null> {
     if (kycId === "latest" && userId) {
-      // Find the latest KYC submission for the user
       return await KYC.findOne({ userId: new mongoose.Types.ObjectId(userId) })
         .sort({ submissionDate: -1 })
         .exec();
     }
 
-    // Regular findById for specific KYC ID
     return await KYC.findById(kycId);
   }
 

@@ -60,7 +60,7 @@ export class UserRepository {
     if (user) {
       user.loginAttempts += 1;
       if (user.loginAttempts >= 5) {
-        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // Lock for 15 minutes
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
       }
       await user.save();
     }

@@ -102,8 +102,7 @@ const KYCSchema = new Schema<IKYC>(
   }
 );
 
-// Indexes for common queries
 KYCSchema.index({ status: 1, submissionDate: -1 });
-KYCSchema.index({ userId: 1});
+KYCSchema.index({ userId: 1 });
 
 export const KYC = mongoose.model<IKYC>("KYC", KYCSchema);

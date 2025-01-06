@@ -43,16 +43,13 @@ function formatValidationErrors(errors: ValidationError[]): string[] {
   const formattedErrors: string[] = [];
 
   function processError(error: ValidationError, prefix = "") {
-    // Handle direct constraints on this level
     if (error.constraints) {
       const firstMessage = Object.values(error.constraints)[0];
       formattedErrors.push(`${prefix}${error.property}: ${firstMessage}`);
     }
 
-    // Process nested errors
     if (error.children && error.children.length > 0) {
       error.children.forEach((childError) => {
-        // Build the nested property path
         const childPrefix = prefix
           ? `${prefix}${error.property}.`
           : `${error.property}.`;

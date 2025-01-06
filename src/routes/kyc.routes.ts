@@ -103,11 +103,10 @@ export class KycRoutes {
     this.authMiddleware = AuthMiddleware.getInstance();
     this.rateLimiter = new RateLimiterMiddleware();
 
-    // Initialize multer directly in the constructor
     this.upload = multer({
       storage: multer.memoryStorage(),
       limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
+        fileSize: 5 * 1024 * 1024,
         files: 1,
       },
       fileFilter: (req, file, cb) => {
@@ -128,10 +127,9 @@ export class KycRoutes {
   }
 
   private setupRoutes(): void {
-    // Configure rate limiter
     const kycSubmissionRateLimit = this.rateLimiter.createRateLimiter({
       windowMs: 24 * 60 * 60 * 1000,
-      max: 10000,
+      max: 100,
       keyPrefix: "kyc-submission",
     });
 
@@ -189,7 +187,7 @@ export class KycRoutes {
       this.authMiddleware.verifyAccessToken,
       kycSubmissionRateLimit,
 
-      this.upload.single("idDocument"), // File upload middleware
+      this.upload.single("idDocument"),
       validateDto(SubmitKycDto),
       this.kycController.submitKyc
     );
@@ -223,6 +221,7 @@ export class KycRoutes {
     this.router.patch(
       "/:kycId/status",
       this.authMiddleware.verifyAccessToken,
+      this.authMiddleware.requireAdmin,
       validateDto(UpdateKycStatusDto),
       this.kycController.updateKycStatus
     );
@@ -257,28 +256,38 @@ export class KycRoutes {
     this.router.get(
       "/pending",
       this.authMiddleware.verifyAccessToken,
+      this.authMiddleware.requireAdmin,
       this.kycController.getPendingKycSubmissions
     );
 
     /**
      * @swagger
-     * /api/v1/kyc/stats:
+     * /api/v1/kyc/{kycId}:
      *   get:
-     *     summary: Get KYC statistics (Admin only)
+     *     summary: Get KYC submission details
      *     tags: [KYC]
      *     security:
      *       - bearerAuth: []
+     *     parameters:
+     *       - in: path
+     *         name: kycId
+     *         required: true
+     *         schema:
+     *           type: string
      *     responses:
      *       200:
-     *         description: KYC statistics retrieved successfully
+     *         description: KYC details retrieved successfully
      *       403:
      *         description: Insufficient permissions
+     *       404:
+     *         description: KYC submission not found
      */
 
     this.router.get(
-      "/stats",
+      "/pending",
       this.authMiddleware.verifyAccessToken,
-      this.kycController.getKycStats
+      this.authMiddleware.requireAdmin,
+      this.kycController.getPendingKycSubmissions
     );
 
     /**

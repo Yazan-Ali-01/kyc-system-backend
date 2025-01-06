@@ -1,11 +1,5 @@
-// src/controllers/kyc.controller.ts
 import { KycRepository } from "@/repositories/kyc.repository";
-import { UserRole } from "@/types/user.types";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/utils/errors/custom-errors";
+import { BadRequestError, NotFoundError } from "@/utils/errors/custom-errors";
 import Logger from "@/utils/logger";
 import { ResponseFormatter } from "@/utils/response-formatter";
 import { Request, Response } from "express";
@@ -76,7 +70,6 @@ export class KycController {
       throw new BadRequestError("ID document file is required");
     }
 
-    // Check if user already has a pending or approved KYC
     const existingKyc = await this.kycRepository.findLatestKycByUserId(userId);
     if (
       existingKyc &&
@@ -118,12 +111,6 @@ export class KycController {
     const { status, rejectionReason } = req.body;
     const reviewerId = req.user!.userId;
 
-    // Verify admin role
-    if (req.user!.role !== UserRole.ADMIN) {
-      throw new ForbiddenError("Only administrators can update KYC status");
-    }
-
-    // Additional validation for rejection reason
     if (status === "rejected" && !rejectionReason) {
       throw new BadRequestError(
         "Rejection reason is required when rejecting a KYC"
@@ -157,14 +144,12 @@ export class KycController {
   public getKycDetails = async (req: Request, res: Response): Promise<void> => {
     const { kycId } = req.params;
     const requesterId = req.user!.userId;
-    const isAdmin = req.user!.role === UserRole.ADMIN;
 
-    // Handle 'latest' special case or specific KYC ID
     const kyc = await this.kycRepository.findKycById(
       kycId,
       kycId === "latest" ? requesterId : undefined
     );
-    // For 'latest' endpoint, return null if no KYC found
+
     if (!kyc && kycId === "latest") {
       res.json(
         ResponseFormatter.success(
@@ -179,17 +164,12 @@ export class KycController {
       throw new NotFoundError("KYC submission not found");
     }
 
-    // Verify access rights (admin or kyc owner)
-    if (!isAdmin && kyc.userId.toString() !== requesterId) {
-      throw new ForbiddenError("You don't have permission to view this KYC");
-    }
-
     res.json(
       ResponseFormatter.success(
         {
           id: kyc.id,
           status: kyc.status,
-          submittedAt: kyc.submissionDate,
+          submissionDate: kyc.submissionDate,
           updatedAt: kyc.lastUpdated,
           reviewDate: kyc.reviewDate,
           rejectionReason: kyc.rejectionReason,
@@ -212,12 +192,6 @@ export class KycController {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    if (req.user!.role !== UserRole.ADMIN) {
-      throw new ForbiddenError(
-        "Only administrators can view pending submissions"
-      );
-    }
-
     const { kyc, pagination } = await this.kycRepository.findKycByStatus(
       "pending",
       page,
@@ -236,10 +210,6 @@ export class KycController {
   };
 
   public getKycStats = async (req: Request, res: Response): Promise<void> => {
-    if (req.user!.role !== UserRole.ADMIN) {
-      throw new ForbiddenError("Only administrators can view KYC statistics");
-    }
-
     const stats = await this.kycRepository.getKycStats();
 
     res.json(

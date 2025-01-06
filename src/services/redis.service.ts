@@ -43,7 +43,7 @@ export class RedisService {
         Logger.info("Redis connection established successfully");
       } catch (error) {
         Logger.error("Failed to connect to Redis:", error);
-        throw error; // Fail fast if Redis cannot connect
+        throw error;
       }
     }
   }

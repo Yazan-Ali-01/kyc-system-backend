@@ -99,6 +99,25 @@ export class AuthMiddleware {
     }
   };
 
+  public requireAdmin = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
+    if (!req.user) {
+      throw new UnauthorizedError("User not authenticated");
+    }
+
+    if (req.user.role !== UserRole.ADMIN) {
+      Logger.warn(
+        `Non-admin user ${req.user.userId} attempted to access admin resource`
+      );
+      throw new ForbiddenError("Only administrators can access this resource");
+    }
+
+    next();
+  };
+
   public checkRole = (roles: UserRole[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
       if (!req.user) {

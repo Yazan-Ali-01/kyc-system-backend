@@ -17,14 +17,12 @@ export interface ValidationErrorItem {
   location: string;
 }
 
-// Base Error interface to ensure all error types have common properties
 export interface BaseError {
   name: string;
   message: string;
   stack?: string;
 }
 
-// src/types/auth.ts
 export interface LoginCredentials {
   email: string;
   password: string;

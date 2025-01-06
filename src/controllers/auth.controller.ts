@@ -1,4 +1,3 @@
-// src/controllers/auth.controller.ts
 import { AUTH_CONSTANTS } from "@/constants/auth.constants";
 import { UserRepository } from "@/repositories/user.repository";
 import { TokenService } from "@/services/token.service";
@@ -33,7 +32,6 @@ export class AuthController {
   public register = async (req: Request, res: Response): Promise<void> => {
     const { email, password, firstName, lastName, role } = req.body;
 
-    // Generate verification token
     const verificationToken = randomBytes(32).toString("hex");
     const user = await this.userRepository.createUser({
       email,
@@ -45,14 +43,11 @@ export class AuthController {
       isEmailVerified: false,
     });
 
-    // TODO: Send verification email
-    // For now, I'll automatically verify the account
     await this.userRepository.updateUser(user.id, {
       isEmailVerified: true,
       verificationToken: undefined,
     });
 
-    // Generate tokens - ADD THIS SECTION
     const tokenId = randomBytes(16).toString("hex");
     const accessToken = this.tokenService.generateAccessToken(
       user.id,
@@ -64,7 +59,6 @@ export class AuthController {
       user.role
     );
 
-    // Store session info - ADD THIS SECTION
     const deviceInfo = req.headers["user-agent"] || "unknown";
     const ipAddress = normalizeIpAddress(
       req.ip || req.socket.remoteAddress || "unknown"
@@ -80,7 +74,6 @@ export class AuthController {
       ),
     };
 
-    // Store tokens and session - ADD THIS SECTION
     await Promise.all([
       this.tokenService.storeRefreshToken(
         user.id,
@@ -92,7 +85,6 @@ export class AuthController {
       this.tokenService.storeUserSession(user.id, sessionInfo),
     ]);
 
-    // Set cookies - ADD THIS SECTION
     res.cookie("access_token", accessToken, {
       ...AUTH_CONSTANTS.COOKIE_OPTIONS,
       maxAge: AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY * 1000,
@@ -130,14 +122,12 @@ export class AuthController {
       throw new UnauthorizedError("Email not found");
     }
 
-    // Check if account is locked
     if (user.lockUntil && user.lockUntil > new Date()) {
       throw new UnauthorizedError(
         "Account is temporarily locked. Please try again later"
       );
     }
 
-    // Verify password
     const isPasswordValid = await user.comparePassword(password);
 
     if (!isPasswordValid) {
@@ -145,26 +135,21 @@ export class AuthController {
       throw new UnauthorizedError("Invalid credentials");
     }
 
-    // Check email verification
     if (!user.isEmailVerified) {
       throw new UnauthorizedError("Please verify your email before logging in");
     }
 
-    // Check if account is active
     if (!user.isActive) {
       throw new UnauthorizedError("Account is disabled");
     }
 
-    // Check session limit
     const sessionCount = await this.tokenService.getUserSessionCount(user.id);
     if (sessionCount >= AUTH_CONSTANTS.MAX_SESSIONS_PER_USER) {
       throw new BadRequestError("Maximum sessions reached");
     }
 
-    // Reset login attempts on successful login
     await this.userRepository.resetLoginAttempts(email);
 
-    // Generate tokens
     const tokenId = randomBytes(16).toString("hex");
     const accessToken = this.tokenService.generateAccessToken(
       user.id,
@@ -177,7 +162,6 @@ export class AuthController {
       user.role
     );
 
-    // Store refresh token and session info
     const sessionInfo: SessionInfo = {
       tokenId,
       deviceInfo,
@@ -199,7 +183,6 @@ export class AuthController {
       this.tokenService.storeUserSession(user.id, sessionInfo),
     ]);
 
-    // Set cookies
     res.cookie("access_token", accessToken, {
       ...AUTH_CONSTANTS.COOKIE_OPTIONS,
       maxAge: AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY * 1000,
@@ -263,26 +246,22 @@ export class AuthController {
       throw new UnauthorizedError("User not found");
     }
 
-    // Generate new tokenId
     const newTokenId = randomBytes(16).toString("hex");
 
-    // Generate new tokens with the same tokenId
     const accessToken = this.tokenService.generateAccessToken(
       userId,
       role,
-      newTokenId // Pass the new tokenId
+      newTokenId
     );
     const refreshToken = this.tokenService.generateRefreshToken(userId, role);
 
-    // Blacklist old refresh token
     await this.tokenService.blacklistToken(
       oldTokenId,
       AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY
     );
 
-    // Store new refresh token and update session with new tokenId
     const sessionInfo: SessionInfo = {
-      tokenId: newTokenId, // Use the new tokenId
+      tokenId: newTokenId,
       deviceInfo,
       ipAddress,
       lastUsed: new Date(),
@@ -294,7 +273,7 @@ export class AuthController {
     await Promise.all([
       this.tokenService.storeRefreshToken(
         userId,
-        newTokenId, // Use new tokenId
+        newTokenId,
         refreshToken,
         deviceInfo,
         ipAddress
@@ -302,7 +281,6 @@ export class AuthController {
       this.tokenService.storeUserSession(userId, sessionInfo),
     ]);
 
-    // Set new cookies
     res.cookie("access_token", accessToken, {
       ...AUTH_CONSTANTS.COOKIE_OPTIONS,
       maxAge: AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY * 1000,
@@ -331,10 +309,8 @@ export class AuthController {
   public logout = async (req: Request, res: Response): Promise<void> => {
     const { userId, tokenId } = req.user!;
 
-    // Revoke session and blacklist tokens
     await this.tokenService.revokeUserSession(userId, tokenId);
 
-    // Clear cookies
     res.clearCookie("access_token", AUTH_CONSTANTS.COOKIE_OPTIONS);
     res.clearCookie("refresh_token", AUTH_CONSTANTS.COOKIE_OPTIONS);
 
@@ -344,10 +320,8 @@ export class AuthController {
   public logoutAll = async (req: Request, res: Response): Promise<void> => {
     const { userId } = req.user!;
 
-    // Revoke all sessions
     await this.tokenService.revokeAllUserSessions(userId);
 
-    // Clear cookies
     res.clearCookie("access_token", AUTH_CONSTANTS.COOKIE_OPTIONS);
     res.clearCookie("refresh_token", AUTH_CONSTANTS.COOKIE_OPTIONS);
 
@@ -377,13 +351,11 @@ export class AuthController {
     const { userId } = req.user!;
     const { email, firstName, lastName } = req.body;
 
-    // Find the user first
     const user = await this.userRepository.findUserById(userId);
     if (!user) {
       throw new NotFoundError("User not found");
     }
 
-    // If email is being updated, check if it's already in use
     if (email && email !== user.email) {
       const existingUser = await this.userRepository.findUserByEmail(email);
       if (existingUser) {

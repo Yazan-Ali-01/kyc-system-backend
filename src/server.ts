@@ -37,7 +37,6 @@ class App {
     const jsonLimit = "5mb";
     const urlEncodedLimit = "5mb";
 
-    // Set up basic Express middleware first
     this.app.use(
       express.json({
         limit: jsonLimit,
@@ -63,7 +62,6 @@ class App {
 
   private setupSwagger(): void {
     if (process.env.NODE_ENV !== "production") {
-      // Disable helmet for Swagger UI
       this.app.use("/api-docs", (req, res, next) => {
         helmet({
           contentSecurityPolicy: false,
@@ -144,7 +142,7 @@ class App {
   private setupMiddleware(): void {
     this.app.use(
       cors({
-        origin: true, // TBD update in production
+        origin: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
@@ -152,17 +150,17 @@ class App {
       })
     );
 
+    this.app.use("/api/v1/uploads", express.static("uploads"));
+
     this.app.get("/test-cors", (req, res) => {
       console.log("Test CORS endpoint reached");
       res.json({ message: "CORS test successful" });
     });
 
-    // 2. Basic parsing middleware
     this.app.use(express.json({ limit: "5mb", strict: false }));
     this.app.use(express.urlencoded({ extended: true, limit: "5mb" }));
     this.app.use(cookieParser());
 
-    // 3. Security middleware
     this.app.use(
       helmet({
         contentSecurityPolicy: {
@@ -176,44 +174,37 @@ class App {
       })
     );
 
-    // 4. Logging and monitoring
     this.app.use(requestLogger);
     this.app.use(monitoringMiddleware);
 
-    // 5. Rate limiting
     const globalRateLimit = this.rateLimiter.createRateLimiter({
       windowMs: 15 * 60 * 1000,
-      max: 10000,
+      max: 100,
     });
     this.app.use(globalRateLimit);
 
-    // 6. Mount the middleware router
     this.app.use(this.middleware);
   }
 
   private setupRoutes(): void {
     Logger.info("Starting route setup");
 
-    // Basic logger for all requests
     this.app.use((req, res, next) => {
       Logger.info(`[DEBUG] Incoming request: ${req.method} ${req.originalUrl}`);
       next();
     });
 
-    // Test server route
     this.app.get("/test-server", (req, res) => {
       Logger.info("Test server accessed");
       res.json({ message: "Express server is working" });
     });
 
-    // Mount the API v1 router to the main app
     this.app.use("/api/v1", routes);
 
     Logger.info("Routes setup completed");
   }
 
   private setupErrorHandling(): void {
-    // 404 handler for unmatched routes
     this.app.use((req, res, next) => {
       if (!res.headersSent) {
         Logger.info(`No route match: ${req.method} ${req.originalUrl}`);
@@ -225,7 +216,6 @@ class App {
 
     this.app.use(errorHandler);
 
-    // Process error handlers for truly uncaught errors
     process.on("uncaughtException", (error: Error) => {
       Logger.error("Uncaught Exception:", error);
 
@@ -265,7 +255,6 @@ class App {
   }
 }
 
-// Start the server
 Logger.info("Server starting...");
 const startServer = async () => {
   try {
@@ -277,7 +266,6 @@ const startServer = async () => {
       Logger.info(`Server listening on port ${port}`);
     });
 
-    // Graceful shutdown handlers
     const gracefulShutdown = async (signal: string) => {
       Logger.info(`Received ${signal}. Starting graceful shutdown...`);
 
@@ -294,7 +282,6 @@ const startServer = async () => {
         }
       });
 
-      // Force shutdown after timeout
       setTimeout(() => {
         Logger.error("Forced shutdown due to timeout");
         process.exit(1);
