@@ -8,7 +8,8 @@ export const AUTH_CONSTANTS = {
   COOKIE_OPTIONS: {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict" as const,
+    sameSite: "none" as const,
     path: "/",
+    domain: process.env.NODE_ENV === "production" ? "vercel.app" : "localhost",
   },
 };
