@@ -10,6 +10,5 @@ export const AUTH_CONSTANTS = {
     secure: process.env.NODE_ENV === "production",
     sameSite: "none" as const,
     path: "/",
-    domain: process.env.NODE_ENV === "production" ? "vercel.app" : "localhost",
   },
 };
