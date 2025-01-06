@@ -1,26 +1,21 @@
 # Build stage
-FROM node:18-alpine AS development
-
-ARG NODE_ENV=development  # Set a default value for development
-ENV NODE_ENV=${NODE_ENV}
+FROM node:18-alpine AS build
 
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install  # Install all dependencies (including dev dependencies)
+RUN npm install  # Install ALL dependencies including devDependencies
 COPY . .
-EXPOSE 3000
-CMD ["npm", "run", "dev"]
+RUN npm run build  # Build TypeScript code
 
 # Production stage
 FROM node:18-alpine AS production
 
-ARG NODE_ENV=production  # Set a default value for production
+ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
 
 WORKDIR /usr/src/app
 COPY package*.json ./
-RUN npm install --only=production  # Install only production dependencies
-COPY . .
-RUN npm run build  # Assuming you have a build script
+RUN npm install --only=production  
+COPY --from=build /usr/src/app/dist ./dist  
 EXPOSE 3000
-CMD ["npm", "run", "start:prod"]  # Ensure this is set in your package.json
+CMD ["npm", "run", "start:prod"]
