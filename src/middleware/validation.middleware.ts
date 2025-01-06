@@ -16,7 +16,10 @@ export function validateDto(dto: any): RequestHandler {
         });
       }
 
-      const dtoObj = plainToInstance(dto, req.body);
+      const dtoObj = plainToInstance(dto, req.body, {
+        enableImplicitConversion: true,
+        excludeExtraneousValues: false,
+      });
       const errors = await validate(dtoObj, {
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -37,26 +40,27 @@ export function validateDto(dto: any): RequestHandler {
 }
 
 function formatValidationErrors(errors: ValidationError[]): string[] {
-  const uniqueErrors = new Map<string, string>();
+  const formattedErrors: string[] = [];
 
-  errors.forEach((error: ValidationError) => {
-    const constraints = error.constraints || {};
-
-    // If the field is missing (undefined), set a "required" message
-    if (
-      "isNotEmpty" in constraints ||
-      Object.keys(constraints).includes("isDefined")
-    ) {
-      uniqueErrors.set(error.property, `${error.property} is required`);
-      return;
+  function processError(error: ValidationError, prefix = "") {
+    // Handle direct constraints on this level
+    if (error.constraints) {
+      const firstMessage = Object.values(error.constraints)[0];
+      formattedErrors.push(`${prefix}${error.property}: ${firstMessage}`);
     }
 
-    // For other validation errors, take the first error message for each field
-    if (!uniqueErrors.has(error.property)) {
-      const firstMessage = Object.values(constraints)[0];
-      uniqueErrors.set(error.property, `${error.property}: ${firstMessage}`);
+    // Process nested errors
+    if (error.children && error.children.length > 0) {
+      error.children.forEach((childError) => {
+        // Build the nested property path
+        const childPrefix = prefix
+          ? `${prefix}${error.property}.`
+          : `${error.property}.`;
+        processError(childError, childPrefix);
+      });
     }
-  });
+  }
 
-  return Array.from(uniqueErrors.values());
+  errors.forEach((error) => processError(error));
+  return formattedErrors;
 }

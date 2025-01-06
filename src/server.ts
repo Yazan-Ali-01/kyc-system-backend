@@ -145,7 +145,7 @@ class App {
     this.app.use(
       cors({
         origin: true, // TBD update in production
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
         credentials: true,
         maxAge: 86400,

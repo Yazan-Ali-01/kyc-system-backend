@@ -114,6 +114,7 @@
 import { AuthController } from "@/controllers/auth.controller";
 import { LoginDto } from "@/dtos/auth/login.dto";
 import { RegisterDto } from "@/dtos/auth/register.dto";
+import { UpdateUserDto } from "@/dtos/auth/update-user.dto";
 import { AuthMiddleware } from "@/middleware/auth.middleware";
 import { RateLimiterMiddleware } from "@/middleware/rate-limit.middleware";
 import { validateDto } from "@/middleware/validation.middleware";
@@ -333,6 +334,47 @@ export class AuthRoutes {
 
     /**
      * @swagger
+     * /api/v1/auth/me:
+     *   get:
+     *     summary: Get current user information
+     *     tags: [Authentication]
+     *     security:
+     *       - cookieAuth: []
+     *     responses:
+     *       200:
+     *         description: Current user information retrieved successfully
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 status:
+     *                   type: string
+     *                   example: success
+     *                 data:
+     *                   type: object
+     *                   properties:
+     *                     userId:
+     *                       type: string
+     *                     role:
+     *                       type: string
+     *                     email:
+     *                       type: string
+     *                     firstName:
+     *                       type: string
+     *                     lastName:
+     *                       type: string
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     */
+    this.router.get(
+      "/me",
+      this.authMiddleware.verifyAccessToken,
+      this.authController.getCurrentUser
+    );
+
+    /**
+     * @swagger
      * /api/v1/auth/sessions/{sessionId}:
      *   delete:
      *     summary: Revoke a specific session
@@ -354,6 +396,70 @@ export class AuthRoutes {
       "/sessions/:sessionId",
       this.authMiddleware.verifyAccessToken,
       this.authController.revokeSession
+    );
+
+     /**
+     * @swagger
+     * /api/v1/auth/update:
+     *   patch:
+     *     summary: Update current user's information
+     *     tags: [Authentication]
+     *     security:
+     *       - cookieAuth: []
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             properties:
+     *               email:
+     *                 type: string
+     *                 format: email
+     *                 description: New email address
+     *               firstName:
+     *                 type: string
+     *                 minLength: 2
+     *                 description: New first name
+     *               lastName:
+     *                 type: string
+     *                 minLength: 2
+     *                 description: New last name
+     *     responses:
+     *       200:
+     *         description: User updated successfully
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 status:
+     *                   type: string
+     *                   example: success
+     *                 data:
+     *                   type: object
+     *                   properties:
+     *                     userId:
+     *                       type: string
+     *                     email:
+     *                       type: string
+     *                     firstName:
+     *                       type: string
+     *                     lastName:
+     *                       type: string
+     *                 message:
+     *                   type: string
+     *                   example: User updated successfully
+     *       401:
+     *         $ref: '#/components/responses/UnauthorizedError'
+     *       400:
+     *         $ref: '#/components/responses/ValidationError'
+     */
+     this.router.patch(
+      "/update",
+      this.authMiddleware.verifyAccessToken,
+      validateDto(UpdateUserDto),
+      this.authController.updateUser
     );
   }
 

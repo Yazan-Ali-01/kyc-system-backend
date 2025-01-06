@@ -188,18 +188,8 @@ export class KycRoutes {
       "/submit",
       this.authMiddleware.verifyAccessToken,
       kycSubmissionRateLimit,
-      (req, res, next) => {
-        console.log("Request headers:", {
-          contentType: req.headers["content-type"],
-        });
-        next();
-      },
 
       this.upload.single("idDocument"), // File upload middleware
-      (req, res, next) => {
-        console.log("File:", req.file); // Add this debug log
-        next();
-      },
       validateDto(SubmitKycDto),
       this.kycController.submitKyc
     );

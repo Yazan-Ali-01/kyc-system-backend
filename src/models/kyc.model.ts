@@ -27,7 +27,6 @@ export interface IKYC extends Document {
   reviewedBy?: mongoose.Types.ObjectId;
   reviewDate?: Date;
   rejectionReason?: string;
-  version: number;
 }
 
 const KYCSchema = new Schema<IKYC>(
@@ -97,10 +96,6 @@ const KYCSchema = new Schema<IKYC>(
     rejectionReason: {
       type: String,
     },
-    version: {
-      type: Number,
-      default: 1,
-    },
   },
   {
     timestamps: true,
@@ -109,6 +104,6 @@ const KYCSchema = new Schema<IKYC>(
 
 // Indexes for common queries
 KYCSchema.index({ status: 1, submissionDate: -1 });
-KYCSchema.index({ userId: 1, version: -1 });
+KYCSchema.index({ userId: 1});
 
 export const KYC = mongoose.model<IKYC>("KYC", KYCSchema);

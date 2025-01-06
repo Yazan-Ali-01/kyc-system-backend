@@ -51,9 +51,67 @@ export class AuthController {
       isEmailVerified: true,
       verificationToken: undefined,
     });
-    const { password: _, ...userWithoutPass } = user;
+
+    // Generate tokens - ADD THIS SECTION
+    const tokenId = randomBytes(16).toString("hex");
+    const accessToken = this.tokenService.generateAccessToken(
+      user.id,
+      user.role,
+      tokenId
+    );
+    const refreshToken = this.tokenService.generateRefreshToken(
+      user.id,
+      user.role
+    );
+
+    // Store session info - ADD THIS SECTION
+    const deviceInfo = req.headers["user-agent"] || "unknown";
+    const ipAddress = normalizeIpAddress(
+      req.ip || req.socket.remoteAddress || "unknown"
+    );
+
+    const sessionInfo: SessionInfo = {
+      tokenId,
+      deviceInfo,
+      ipAddress,
+      lastUsed: new Date(),
+      expiryTime: new Date(
+        Date.now() + AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY * 1000
+      ),
+    };
+
+    // Store tokens and session - ADD THIS SECTION
+    await Promise.all([
+      this.tokenService.storeRefreshToken(
+        user.id,
+        tokenId,
+        refreshToken,
+        deviceInfo,
+        ipAddress
+      ),
+      this.tokenService.storeUserSession(user.id, sessionInfo),
+    ]);
+
+    // Set cookies - ADD THIS SECTION
+    res.cookie("access_token", accessToken, {
+      ...AUTH_CONSTANTS.COOKIE_OPTIONS,
+      maxAge: AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY * 1000,
+    });
+
+    res.cookie("refresh_token", refreshToken, {
+      ...AUTH_CONSTANTS.COOKIE_OPTIONS,
+      maxAge: AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY * 1000,
+    });
+
     const formattedResponse = ResponseFormatter.success(
-      userWithoutPass,
+      {
+        userId: user.id,
+        role: user.role,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+
       "User registered successfully",
       201
     );
@@ -167,8 +225,34 @@ export class AuthController {
     );
   };
 
+  public getCurrentUser = async (
+    req: Request,
+    res: Response
+  ): Promise<void> => {
+    const { userId } = req.user!;
+
+    const user = await this.userRepository.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedError("User not found");
+    }
+
+    res.json(
+      ResponseFormatter.success(
+        {
+          userId: user.id,
+          role: user.role,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        "User retrieved successfully",
+        200
+      )
+    );
+  };
+
   public refresh = async (req: Request, res: Response): Promise<void> => {
-    const { userId, role, tokenId } = req.user!;
+    const { userId, role, tokenId: oldTokenId } = req.user!;
     const deviceInfo = req.headers["user-agent"] || "unknown";
     const ipAddress = normalizeIpAddress(
       req.ip || req.socket.remoteAddress || "unknown"
@@ -179,19 +263,26 @@ export class AuthController {
       throw new UnauthorizedError("User not found");
     }
 
-    // Generate new tokens
-    const accessToken = this.tokenService.generateAccessToken(userId, role);
+    // Generate new tokenId
+    const newTokenId = randomBytes(16).toString("hex");
+
+    // Generate new tokens with the same tokenId
+    const accessToken = this.tokenService.generateAccessToken(
+      userId,
+      role,
+      newTokenId // Pass the new tokenId
+    );
     const refreshToken = this.tokenService.generateRefreshToken(userId, role);
 
     // Blacklist old refresh token
     await this.tokenService.blacklistToken(
-      tokenId,
+      oldTokenId,
       AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY
     );
 
-    // Store new refresh token and update session
+    // Store new refresh token and update session with new tokenId
     const sessionInfo: SessionInfo = {
-      tokenId: req.user!.tokenId,
+      tokenId: newTokenId, // Use the new tokenId
       deviceInfo,
       ipAddress,
       lastUsed: new Date(),
@@ -203,7 +294,7 @@ export class AuthController {
     await Promise.all([
       this.tokenService.storeRefreshToken(
         userId,
-        tokenId,
+        newTokenId, // Use new tokenId
         refreshToken,
         deviceInfo,
         ipAddress
@@ -277,6 +368,49 @@ export class AuthController {
       ResponseFormatter.success(
         sessions,
         "Active sessions retrieved successfully",
+        200
+      )
+    );
+  };
+
+  public updateUser = async (req: Request, res: Response): Promise<void> => {
+    const { userId } = req.user!;
+    const { email, firstName, lastName } = req.body;
+
+    // Find the user first
+    const user = await this.userRepository.findUserById(userId);
+    if (!user) {
+      throw new NotFoundError("User not found");
+    }
+
+    // If email is being updated, check if it's already in use
+    if (email && email !== user.email) {
+      const existingUser = await this.userRepository.findUserByEmail(email);
+      if (existingUser) {
+        throw new BadRequestError("Email already in use");
+      }
+    }
+
+    const updatedUser = await this.userRepository.updateUser(userId, {
+      ...(email && { email }),
+      ...(firstName && { firstName }),
+      ...(lastName && { lastName }),
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError("User not found");
+    }
+
+    res.json(
+      ResponseFormatter.success(
+        {
+          userId: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          role: updatedUser.role,
+        },
+        "User updated successfully",
         200
       )
     );

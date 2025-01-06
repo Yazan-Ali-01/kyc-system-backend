@@ -184,10 +184,10 @@ Alternatively, you can use Docker Compose to run the entire application stack (i
 
 ```bash
 # Development
-docker-compose -f docker-compose.dev.yml --env-file .env.development up  --build
+docker compose -f docker-compose.dev.yml --env-file .env.development up  --build
 
 # Production
-docker-compose -f docker-compose.prod.yml --env-file .env.prod up  --build
+docker compose -f docker-compose.prod.yml --env-file .env.prod up  --build
 
 # View logs
 docker compose logs -f

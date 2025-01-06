@@ -159,7 +159,22 @@ export class KycController {
     const requesterId = req.user!.userId;
     const isAdmin = req.user!.role === UserRole.ADMIN;
 
-    const kyc = await this.kycRepository.findKycById(kycId);
+    // Handle 'latest' special case or specific KYC ID
+    const kyc = await this.kycRepository.findKycById(
+      kycId,
+      kycId === "latest" ? requesterId : undefined
+    );
+    // For 'latest' endpoint, return null if no KYC found
+    if (!kyc && kycId === "latest") {
+      res.json(
+        ResponseFormatter.success(
+          null,
+          "No KYC submissions found for user",
+          204
+        )
+      );
+      return;
+    }
     if (!kyc) {
       throw new NotFoundError("KYC submission not found");
     }
@@ -174,8 +189,8 @@ export class KycController {
         {
           id: kyc.id,
           status: kyc.status,
-          submissionDate: kyc.submissionDate,
-          lastUpdated: kyc.lastUpdated,
+          submittedAt: kyc.submissionDate,
+          updatedAt: kyc.lastUpdated,
           reviewDate: kyc.reviewDate,
           rejectionReason: kyc.rejectionReason,
           firstName: kyc.firstName,

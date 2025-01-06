@@ -33,12 +33,23 @@ export class KycRepository {
     return await kyc.save();
   }
 
-  public async findKycById(kycId: string): Promise<IKYC | null> {
+  public async findKycById(
+    kycId: string,
+    userId?: string
+  ): Promise<IKYC | null> {
+    if (kycId === "latest" && userId) {
+      // Find the latest KYC submission for the user
+      return await KYC.findOne({ userId: new mongoose.Types.ObjectId(userId) })
+        .sort({ submissionDate: -1 })
+        .exec();
+    }
+
+    // Regular findById for specific KYC ID
     return await KYC.findById(kycId);
   }
 
   public async findLatestKycByUserId(userId: string): Promise<IKYC | null> {
-    return await KYC.findOne({ userId }).sort({ version: -1 }).exec();
+    return await KYC.findOne({ userId }).sort({ submissionDate: -1 }).exec();
   }
 
   public async updateKycStatus(
