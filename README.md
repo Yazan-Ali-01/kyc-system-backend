@@ -2,6 +2,8 @@
 
 A robust and secure backend service built with Express.js and TypeScript, featuring authentication, session management, KYC functionality, and comprehensive reporting capabilities. The service includes rate limiting, monitoring, and comprehensive error handling.
 
+The application is containerized with Docker and deployed on Heroku (accessible at https://kyc-system-backend-b334d2f5784c.herokuapp.com/), utilizing Heroku Redis add-on for session management and caching, and MongoDB Atlas for the database layer.
+
 ## Features
 
 - **Authentication System**
@@ -38,9 +40,10 @@ A robust and secure backend service built with Express.js and TypeScript, featur
   - Error handling middleware
 
 - **Infrastructure**
-  - MongoDB database integration
-  - Redis for caching and session management
+  - MongoDB Atlas database integration
+  - Heroku Redis for caching and session management
   - Docker containerization
+  - Heroku deployment pipeline
 
 ## Architecture & Design Patterns
 
@@ -68,11 +71,12 @@ A robust and secure backend service built with Express.js and TypeScript, featur
 Due to the tight deadline of the assessment (3 days), several technical considerations and potential improvements were identified:
 
 **Implemented Features:**
-- Basic MongoDB and Redis integration
+- MongoDB Atlas and Heroku Redis integration
 - Essential security measures (JWT, rate limiting)
 - Core KYC and reporting functionality
 - Docker containerization
 - Clean architecture pattern implementation
+- Heroku deployment pipeline
 
 **Future Improvements:**
 1. Security Enhancements:
@@ -91,8 +95,8 @@ Due to the tight deadline of the assessment (3 days), several technical consider
 
 4. Infrastructure:
    - Add load balancing capabilities
-   - Implement caching strategies
-   - Set up continuous integration/deployment
+   - Implement advanced caching strategies
+   - Enhance continuous integration/deployment pipeline
 
 ## Project Structure
 
@@ -117,11 +121,11 @@ Due to the tight deadline of the assessment (3 days), several technical consider
 ## Prerequisites
 
 - Node.js (v18 or higher)
-- MongoDB (v4.4 or higher)
-- Redis (v6 or higher)
-- Docker & Docker Compose (optional, for containerized setup)
+- MongoDB Atlas account
+- Heroku account with Redis add-on
+- Docker & Docker Compose (optional, for local development)
 
-## Docker Setup (Recommended)
+## Docker Setup (Recommended for Development)
 
 The entire application stack can be run using Docker Compose:
 
@@ -140,38 +144,16 @@ docker compose down
 
 ### 1. Database Setup
 
-#### Option A: Using Docker
+#### Development Environment
 
-```bash
-# Start MongoDB
-docker run --name mongodb -p 27017:27017 -d mongo:latest
+1. MongoDB Atlas Setup:
+   - Create a cluster in MongoDB Atlas
+   - Configure network access and database user
+   - Obtain connection string
 
-# Start Redis
-docker run --name redis -p 6379:6379 -d redis:latest
-
-# Verify containers are running
-docker ps
-```
-
-#### Option B: Local Installation
-
-1. Install MongoDB:
-   ```bash
-   # On Ubuntu/Debian
-   sudo systemctl start mongod
-
-   # On macOS with Homebrew
-   brew services start mongodb-community
-   ```
-
-2. Install Redis:
-   ```bash
-   # On Ubuntu/Debian
-   sudo systemctl start redis
-
-   # On macOS with Homebrew
-   brew services start redis
-   ```
+2. Heroku Redis Setup:
+   - Add Redis add-on to your Heroku application
+   - Obtain Redis URL from Heroku configuration
 
 ### 2. Application Setup
 
@@ -193,8 +175,8 @@ docker ps
    Update the following variables:
    ```
    PORT=3000
-   MONGODB_URI=mongodb://localhost:27017/your-database
-   REDIS_URL=redis://localhost:6379
+   MONGODB_URI=your-mongodb-atlas-uri
+   REDIS_URL=your-heroku-redis-url
    JWT_SECRET=your-secret-key
    ```
 
@@ -254,15 +236,4 @@ The API documentation is available via Swagger UI when running in development mo
 
 - Built-in logging system with rotation (see `/logs`)
 - Error tracking and monitoring middleware
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Heroku application metrics and logs
