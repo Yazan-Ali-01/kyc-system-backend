@@ -9,6 +9,11 @@ export class RedisService {
     console.log("process.env.REDIS_URL", process.env.REDIS_URL);
     this.client = createClient({
       url: `${process.env.REDIS_URL}` || "redis://localhost:6379",
+      socket: {
+        tls: true,
+        rejectUnauthorized: false,
+        requestCert: true,
+      },
     });
 
     this.setupEventListeners();
