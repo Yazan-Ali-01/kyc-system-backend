@@ -97,12 +97,14 @@ class App {
     Logger.info("Beginning initialize sequence");
 
     Logger.info("Loading environment configuration...");
-    try {
-      loadEnvConfig();
-      Logger.info("Environment configuration loaded successfully");
-    } catch (error) {
-      Logger.error("Failed to load environment configuration:", error);
-      throw error;
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        loadEnvConfig();
+        Logger.info("Environment configuration loaded successfully");
+      } catch (error) {
+        Logger.error("Failed to load environment configuration:", error);
+        throw error;
+      }
     }
 
     Logger.info("Initializing MongoDB connection...");
