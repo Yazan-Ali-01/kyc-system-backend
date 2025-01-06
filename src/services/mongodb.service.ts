@@ -24,6 +24,7 @@ export class MongoDBService {
       const mongoUrl =
         process.env.MONGODB_URI || "mongodb://mongodb:27017/yourdbname";
 
+      console.log("mongoUrl", mongoUrl);
       await mongoose.connect(mongoUrl, {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
