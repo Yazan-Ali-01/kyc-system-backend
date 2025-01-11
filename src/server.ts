@@ -56,12 +56,14 @@ class App {
 
   private async loadEnvironment(): Promise<void> {
     Logger.info("Loading environment configuration...");
-    try {
-      await loadEnvConfig();
-      Logger.info("Environment configuration loaded successfully");
-    } catch (error) {
-      Logger.error("Failed to load environment configuration:", error);
-      throw error;
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        loadEnvConfig();
+        Logger.info("Environment configuration loaded successfully");
+      } catch (error) {
+        Logger.error("Failed to load environment configuration:", error);
+        throw error;
+      }
     }
   }
 
