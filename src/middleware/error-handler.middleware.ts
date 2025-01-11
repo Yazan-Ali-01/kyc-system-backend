@@ -3,12 +3,25 @@ import Logger from "@/utils/logger";
 import { NextFunction, Request, Response } from "express";
 import { MongoServerError } from "mongodb";
 import { Error as MongooseError } from "mongoose";
-import { AppError } from "../utils/errors/custom-errors";
+import { AppError, NotFoundError } from "../utils/errors/custom-errors";
 import { ResponseFormatter } from "../utils/response-formatter";
 
 interface ExpressValidationError extends BaseError {
   array: () => ValidationErrorItem[];
 }
+
+export const notFoundHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!res.headersSent) {
+    Logger.info(`No route match: ${req.method} ${req.originalUrl}`);
+    throw new NotFoundError();
+  } else {
+    next();
+  }
+};
 
 type CombinedError = (
   | Error

@@ -1,63 +1,168 @@
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
-import swaggerUi from "swagger-ui-express";
-
-import express, { Express, Router } from "express";
+import express, { Express } from "express";
 import "express-async-errors";
 import helmet from "helmet";
 import "reflect-metadata";
 
 import { loadEnvConfig } from "@/config/env";
 import { swaggerSpec } from "@/config/swagger";
-import { errorHandler } from "@/middleware/error-handler.middleware";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "@/middleware/error-handler.middleware";
 import { requestLogger } from "@/middleware/logging.middleware";
 import { monitoringMiddleware } from "@/middleware/monitoring.middleware";
 import { RateLimiterMiddleware } from "@/middleware/rate-limit.middleware";
 import routes from "@/routes";
 import { MongoDBService } from "@/services/mongodb.service";
 import { RedisService } from "@/services/redis.service";
-import { AppError, NotFoundError } from "@/utils/errors/custom-errors";
 import Logger from "@/utils/logger";
+import * as swaggerUi from "swagger-ui-express";
 
 class App {
   public app: Express;
-  private middleware: Router;
+  public server: any;
+  private readonly JSON_LIMIT = "5mb";
+  private readonly URL_ENCODED_LIMIT = "5mb";
+  private readonly SHUTDOWN_TIMEOUT = 10000;
   private mongoDBService: MongoDBService;
-  private rateLimiter: RateLimiterMiddleware;
   private redisService: RedisService;
+  private rateLimiter: RateLimiterMiddleware;
 
   constructor() {
     this.app = express();
-    this.middleware = Router();
     this.mongoDBService = MongoDBService.getInstance();
     this.redisService = RedisService.getInstance();
     this.rateLimiter = new RateLimiterMiddleware();
+  }
 
-    const jsonLimit = "5mb";
-    const urlEncodedLimit = "5mb";
+  public async init(): Promise<Express> {
+    try {
+      await this.loadEnvironment();
+      await this.initializeServices();
+      await this.setupMiddleware();
+      this.setupSwagger();
+      await this.setupRoutes();
+      this.setupErrorHandling();
+      return this.app;
+    } catch (error) {
+      Logger.error("Initialization failed:", error);
+      throw new Error("Application initialization failed");
+    }
+  }
 
-    this.app.use(
-      express.json({
-        limit: jsonLimit,
-        strict: false,
-      })
-    );
-    this.app.use(
-      express.urlencoded({
-        extended: true,
-        limit: urlEncodedLimit,
-      })
-    );
+  private async loadEnvironment(): Promise<void> {
+    Logger.info("Loading environment configuration...");
+    try {
+      await loadEnvConfig();
+      Logger.info("Environment configuration loaded successfully");
+    } catch (error) {
+      Logger.error("Failed to load environment configuration:", error);
+      throw error;
+    }
+  }
 
-    this.app.use((req, res, next) => {
-      if (req.headers["content-type"]?.includes("multipart/form-data")) {
-        return next();
-      }
-      express.json({ limit: jsonLimit })(req, res, next);
-    });
+  private async initializeServices(): Promise<void> {
+    Logger.info("Initializing services...");
 
+    try {
+      // Initialize services concurrently
+      await Promise.all([
+        (async () => {
+          Logger.info("Initializing MongoDB connection...");
+          await this.mongoDBService.connect();
+          Logger.info("MongoDB connection established");
+        })(),
+        (async () => {
+          Logger.info("Initializing Redis connection...");
+          await this.redisService.connect();
+          Logger.info("Redis connection established");
+        })(),
+      ]);
+    } catch (error) {
+      Logger.error("Failed to initialize services:", error);
+      throw error;
+    }
+  }
+
+  private async setupMiddleware(): Promise<void> {
+    Logger.info("Setting up middleware...");
+
+    // Security middleware
+    this.setupSecurityMiddleware();
+
+    // Parse requests
+    this.setupRequestParsing();
+
+    // Compression (before routes)
+    this.setupCompression();
+
+    // Development logging
+    this.setupDevelopmentLogging();
+
+    // Health check
     this.setupHealthCheck();
+
+    Logger.info("Middleware setup completed");
+  }
+
+  private setupSecurityMiddleware(): void {
+    if (process.env.NODE_ENV === "production") {
+      this.app.use(
+        this.rateLimiter.createRateLimiter({
+          windowMs: 15 * 60 * 1000,
+          max: 100,
+          keyPrefix: "global-rate-limit",
+        })
+      );
+    }
+
+    this.app.use(
+      helmet({
+        contentSecurityPolicy: process.env.NODE_ENV === "production",
+        dnsPrefetchControl: true,
+        frameguard: true,
+        hidePoweredBy: true,
+        hsts: process.env.NODE_ENV === "production",
+        ieNoOpen: true,
+        noSniff: true,
+        xssFilter: true,
+      })
+    );
+
+    this.app.use(
+      cors({
+        origin: process.env.ALLOWED_ORIGINS?.split(",") || true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: ["Content-Type", "Authorization"],
+        credentials: true,
+        maxAge: 86400,
+      })
+    );
+  }
+
+  private setupRequestParsing(): void {
+    this.app.use(express.json({ limit: this.JSON_LIMIT, strict: false }));
+    this.app.use(
+      express.urlencoded({ extended: true, limit: this.URL_ENCODED_LIMIT })
+    );
+    this.app.use(cookieParser(process.env.COOKIE_SECRET));
+  }
+
+  private setupCompression(): void {
+    if (process.env.NODE_ENV === "production") {
+      this.app.use(compression());
+    }
+  }
+
+  private setupDevelopmentLogging(): void {
+    if (process.env.NODE_ENV === "development") {
+      this.app.use(requestLogger);
+      this.app.use(monitoringMiddleware);
+    }
   }
 
   private setupSwagger(): void {
@@ -81,183 +186,94 @@ class App {
     }
   }
 
-  public async init(): Promise<Express> {
-    await this.initialize();
-    return this.app;
-  }
-
   private setupHealthCheck(): void {
     this.app.get("/health", (req, res) => {
-      Logger.info("Health check accessed");
-      res.status(200).send("healthy");
+      res.status(200).json({
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+      });
     });
   }
 
-  private async initialize() {
-    Logger.info("Beginning initialize sequence");
-
-    Logger.info("Loading environment configuration...");
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        loadEnvConfig();
-        Logger.info("Environment configuration loaded successfully");
-      } catch (error) {
-        Logger.error("Failed to load environment configuration:", error);
-        throw error;
-      }
-    }
-
-    Logger.info("Initializing MongoDB connection...");
-    try {
-      await this.mongoDBService.connect();
-      Logger.info("MongoDB connection established");
-    } catch (error) {
-      Logger.error("Failed to initialize MongoDB:", error);
-      throw error;
-    }
-
-    Logger.info("Initializing Redis connection...");
-    try {
-      await this.redisService.connect();
-      Logger.info("Redis connection established");
-    } catch (error) {
-      Logger.error("Failed to initialize Redis:", error);
-      throw error;
-    }
-
-    Logger.info("Setting up middleware...");
-    this.setupMiddleware();
-    Logger.info("Middleware setup completed");
-
-    Logger.info("Setting up Swagger...");
-    this.setupSwagger();
-    Logger.info("Swagger setup completed");
-
+  private async setupRoutes(): Promise<void> {
     Logger.info("Setting up routes...");
-    this.setupRoutes();
-    Logger.info("Routes setup completed");
 
-    Logger.info("Setting up error handling...");
-    this.setupErrorHandling();
-    Logger.info("Error handling setup completed");
-  }
-  private setupMiddleware(): void {
-    this.app.use(
-      cors({
-        origin: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-        maxAge: 86400,
-      })
-    );
-
-    this.app.use("/api/v1/uploads", express.static("uploads"));
-
-    this.app.get("/test-cors", (req, res) => {
-      console.log("Test CORS endpoint reached");
-      res.json({ message: "CORS test successful" });
-    });
-
-    this.app.use(express.json({ limit: "5mb", strict: false }));
-    this.app.use(express.urlencoded({ extended: true, limit: "5mb" }));
-    this.app.use(cookieParser());
-
-    this.app.use(
-      helmet({
-        contentSecurityPolicy: {
-          directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
-          },
-        },
-      })
-    );
-
-    this.app.use(requestLogger);
-    this.app.use(monitoringMiddleware);
-
-    const globalRateLimit = this.rateLimiter.createRateLimiter({
-      windowMs: 15 * 60 * 1000,
-      max: 100,
-    });
-    this.app.use(globalRateLimit);
-
-    this.app.use(this.middleware);
-  }
-
-  private setupRoutes(): void {
-    Logger.info("Starting route setup");
-
-    this.app.use((req, res, next) => {
-      Logger.info(`[DEBUG] Incoming request: ${req.method} ${req.originalUrl}`);
-      next();
-    });
-
-    this.app.get("/test-server", (req, res) => {
-      Logger.info("Test server accessed");
-      res.json({ message: "Express server is working" });
-    });
+    if (process.env.NODE_ENV === "development") {
+      this.app.use((req, res, next) => {
+        Logger.info(
+          `[DEBUG] Incoming request: ${req.method} ${req.originalUrl}`
+        );
+        next();
+      });
+    }
 
     this.app.use("/api/v1", routes);
-
     Logger.info("Routes setup completed");
   }
 
   private setupErrorHandling(): void {
-    this.app.use((req, res, next) => {
-      if (!res.headersSent) {
-        Logger.info(`No route match: ${req.method} ${req.originalUrl}`);
-        throw new NotFoundError();
-      } else {
-        next();
-      }
-    });
-
+    this.app.use(notFoundHandler);
     this.app.use(errorHandler);
-
-    process.on("uncaughtException", (error: Error) => {
-      Logger.error("Uncaught Exception:", error);
-
-      if (error instanceof AppError && error.isOperational) {
-        Logger.info("Operational error, no need to crash");
-        return;
-      }
-
-      Logger.error("Fatal error encountered, shutting down");
-      process.exit(1);
-    });
-
-    process.on("unhandledRejection", (reason: any) => {
-      Logger.error("Unhandled Rejection:", reason);
-
-      if (reason instanceof AppError && reason.isOperational) {
-        Logger.info("Operational error, no need to crash");
-        return;
-      }
-
-      Logger.error("Fatal error encountered, shutting down");
-      process.exit(1);
-    });
+    this.setupProcessErrorHandlers();
   }
 
-  public async shutdown(): Promise<void> {
-    Logger.info("Shutting down application...");
+  private setupProcessErrorHandlers(): void {
+    process.on(
+      "uncaughtException",
+      this.handleFatalError("Uncaught Exception")
+    );
+    process.on(
+      "unhandledRejection",
+      this.handleFatalError("Unhandled Rejection")
+    );
+  }
+
+  private handleFatalError(type: string) {
+    return async (error: Error) => {
+      Logger.error(`${type}:`, error);
+      await this.gracefulShutdown("SIGTERM");
+    };
+  }
+
+  public async gracefulShutdown(signal: string): Promise<void> {
+    Logger.info(`Received ${signal}. Starting graceful shutdown...`);
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Shutdown timed out"));
+      }, this.SHUTDOWN_TIMEOUT);
+    });
 
     try {
-      await this.mongoDBService.disconnect();
-      await this.redisService.disconnect();
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          if (this.server) {
+            this.server.close(() => {
+              Logger.info("HTTP server closed");
+              resolve();
+            });
+          } else {
+            resolve();
+          }
+        }),
+        timeoutPromise,
+      ]);
+
+      await Promise.all([
+        this.mongoDBService.disconnect(),
+        this.redisService.disconnect(),
+      ]);
+
       Logger.info("All connections closed successfully");
+      process.exit(0);
     } catch (error) {
-      Logger.error("Error during shutdown:", error);
-      throw error;
+      Logger.error("Failed to shutdown gracefully:", error);
+      process.exit(1);
     }
   }
 }
 
-Logger.info("Server starting...");
 const startServer = async () => {
   try {
     const app = new App();
@@ -268,34 +284,24 @@ const startServer = async () => {
       Logger.info(`Server listening on port ${port}`);
     });
 
-    const gracefulShutdown = async (signal: string) => {
-      Logger.info(`Received ${signal}. Starting graceful shutdown...`);
+    // Store server reference for graceful shutdown
+    app.server = server;
 
-      server.close(async () => {
-        Logger.info("HTTP server closed");
-
-        try {
-          await app.shutdown();
-          Logger.info("All connections closed successfully");
-          process.exit(0);
-        } catch (error) {
-          Logger.error("Error during shutdown:", error);
-          process.exit(1);
-        }
-      });
-
-      setTimeout(() => {
-        Logger.error("Forced shutdown due to timeout");
-        process.exit(1);
-      }, 30000);
-    };
-
-    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+    // Setup signal handlers for graceful shutdown
+    const signals: NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
+    signals.forEach((signal) => {
+      process.on(signal, () => app.gracefulShutdown(signal));
+    });
   } catch (error) {
     Logger.error("Failed to start server:", error);
     process.exit(1);
   }
 };
 
-startServer();
+// Run the server
+if (require.main === module) {
+  startServer();
+}
+
+// Export for testing
+export default App;

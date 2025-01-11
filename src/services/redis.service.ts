@@ -7,14 +7,18 @@ export class RedisService {
 
   private constructor() {
     console.log("process.env.REDIS_URL", process.env.REDIS_URL);
-    this.client = createClient({
-      url: `${process.env.REDIS_URL}` || "redis://localhost:6379",
-      socket: {
-        tls: true,
-        rejectUnauthorized: false,
-        requestCert: true,
-      },
-    });
+    const config = {
+      url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+      ...(process.env.NODE_ENV === "production" && {
+        socket: {
+          tls: true,
+          rejectUnauthorized: false,
+          requestCert: true,
+        },
+      }),
+    };
+
+    this.client = createClient(config);
 
     this.setupEventListeners();
   }

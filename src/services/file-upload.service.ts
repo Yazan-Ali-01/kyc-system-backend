@@ -2,6 +2,7 @@ import Logger from "@/utils/logger";
 import { Request } from "express";
 import multer from "multer";
 
+// I'm not using this service but I set it up for more complex needs
 export class FileUploadService {
   private static instance: FileUploadService;
 
