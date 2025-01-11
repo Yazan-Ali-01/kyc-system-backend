@@ -8,7 +8,9 @@ export class RedisService {
   private constructor() {
     console.log("process.env.REDIS_URL", process.env.REDIS_URL);
     const config = {
-      url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+      url:
+        process.env.REDIS_URL ||
+        `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
       ...(process.env.NODE_ENV === "production" && {
         socket: {
           tls: true,
